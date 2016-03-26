@@ -1,0 +1,6 @@
+autoloaders:
+  Wizkunde: %module%/src
+
+commands:
+  customCommands:
+    - Wizkunde\UniqueCommand
