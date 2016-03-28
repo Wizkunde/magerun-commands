@@ -260,6 +260,6 @@ class MediaMissingCommand extends AbstractMagentoCommand
 
         $progress->finish();
 
-        return $missing++;
+        return $missing;
     }
 }
