@@ -58,7 +58,7 @@ class MediaDuplicatesCommand extends AbstractMagentoCommand
           ->setDefinition(
               new InputDefinition(array(
                   new InputOption('sku', 's', InputOption::VALUE_REQUIRED, 'Sku for when in test mode'),
-                  new InputArgument('mode', InputOption::VALUE_REQUIRED, 'live, test or dry (default)')
+                  new InputArgument('mode', InputOption::VALUE_REQUIRED, 'rollback, live, test or dry (default)')
               ))
           );
     }
@@ -77,7 +77,7 @@ class MediaDuplicatesCommand extends AbstractMagentoCommand
 			$this->setInputInterface($input);
 			$this->setOutputInterface($output);
 
-            if(in_array($input->getArgument('mode'), array('dry', 'test', 'live'))) {
+            if(in_array($input->getArgument('mode'), array('dry', 'test', 'live', 'rollback'))) {
                 $this->setMode($input->getArgument('mode'));
             }
 
@@ -164,6 +164,28 @@ class MediaDuplicatesCommand extends AbstractMagentoCommand
      */
 	protected function runRemoveDuplicateImagesCommand()
 	{
+        if($this->getMode() == 'rollback') {
+            $helper = $this->getHelper('question');
+            $question = new ConfirmationQuestion('<fg=red;options=bold>are you sure that you want to rollback the duplicates delete? (y/N): </>', false);
+
+            if ($helper->ask($this->getInputInterface(), $this->getOutputInterface(), $question) === false) {
+                $this->getOutputInterface()->writeln('<fg=red;options=bold>Canceled the rollback due to confirmation!</>');
+                return;
+            }
+
+            return $this->rollbackDuplicateImages();
+        }
+
+        if($this->getMode() == 'live' || $this->getMode() == 'test') {
+            $helper = $this->getHelper('question');
+            $question = new ConfirmationQuestion('<fg=red;options=bold>Have you backupped the database structure with n98-magerun db:dump? (y/N): </>', false);
+
+            if ($helper->ask($this->getInputInterface(), $this->getOutputInterface(), $question) === false) {
+                $this->getOutputInterface()->writeln('<fg=red;options=bold>Canceled because the database has not been backuped!</>');
+                return;
+            }
+        }
+
 		if($this->getMode() == 'live') {
 			$helper = $this->getHelper('question');
 			$question = new ConfirmationQuestion('<fg=red;options=bold>This cannot be undone, are you sure that you want to continue? (y/N): </>', false);
@@ -190,6 +212,39 @@ class MediaDuplicatesCommand extends AbstractMagentoCommand
 
         $this->removeDuplicateImages();
 	}
+
+    /**
+     * Rollback all the images we moved to the backup directory
+     */
+    protected function rollbackDuplicateImages()
+    {
+        $files = glob($this->getBackupdir() . DS . 'catalog' . DS . 'product' . DS . '[A-z0-9]' . DS . '[A-z0-9]' . DS . '*');
+        $totalFiles = count($files);
+
+        if($totalFiles > 0) {
+            // create a new progress bar (50 units)
+            $progress = new ProgressBar($this->getOutputInterface(), $totalFiles);
+
+            foreach($files as $i => $file) {
+                $targetFile = str_replace('var/duplicates', 'media', $file);
+
+                if(is_file($file)) {
+                    \Mage::log("Restoring file: " . $file, null, $this->logfile);
+                    rename($file, $targetFile);
+                }
+                $progress->advance();
+            }
+
+            $progress->finish();
+
+            $this->getOutputInterface()->writeLn(PHP_EOL);
+            $this->getOutputInterface()->writeLn('<fg=green;options=bold>Please restore the backup database with n98-magerun db:import!</>');
+
+
+        } else {
+            $this->getOutputInterface()->writeLn('<fg=green;options=bold>Nothing to rollback, the rollback directory contains no files!</>');
+        }
+    }
 
     /**
      * Remove the duplicates
