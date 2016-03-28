@@ -3,4 +3,5 @@ autoloaders:
 
 commands:
   customCommands:
+    - Wizkunde\CacheWarmerCommand
     - Wizkunde\UniqueCommand

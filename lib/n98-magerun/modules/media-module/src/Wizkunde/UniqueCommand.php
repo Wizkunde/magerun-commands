@@ -10,6 +10,7 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Console\Helper\ProgressBar;
 
 class UniqueCommand extends AbstractMagentoCommand
 {
@@ -23,6 +24,13 @@ class UniqueCommand extends AbstractMagentoCommand
      * @var string
      */
     protected $logdir = '/var/log';
+
+    /**
+     * The logfile that we use
+     *
+     * @var string
+     */
+    protected $logfile = '';
 
     /**
      * Whats the directory we backup in (or fetch the backup from)
@@ -45,7 +53,7 @@ class UniqueCommand extends AbstractMagentoCommand
     protected function configure()
     {
       $this
-          ->setName('media:unique')
+          ->setName('wizkunde:media:remove-duplicates')
           ->setDescription('Remove double media files from products')
           ->setDefinition(
               new InputDefinition(array(
@@ -64,12 +72,16 @@ class UniqueCommand extends AbstractMagentoCommand
 	{
 		$this->detectMagento($output);
 		if ($this->initMagento()) {
+            \Mage::setIsDeveloperMode(true);
+
 			$this->setInputInterface($input);
 			$this->setOutputInterface($output);
 
             if(in_array($input->getArgument('mode'), array('dry', 'test', 'live'))) {
                 $this->setMode($input->getArgument('mode'));
             }
+
+            $this->logfile = 'duplicates-' . $this->getMode() . '-' . date('YmdHis', time()) . '.log';
 
             $this->runUniqueImagesCommand();
 		}
@@ -152,8 +164,6 @@ class UniqueCommand extends AbstractMagentoCommand
      */
 	protected function runUniqueImagesCommand()
 	{
-        $this->getOutputInterface()->writeLn('<fg=green;options=bold>Backups will be stored in: '. $this->getBackupdir() . '!</>');
-
 		if($this->getMode() == 'live') {
 			$helper = $this->getHelper('question');
 			$question = new ConfirmationQuestion('<fg=red;options=bold>This cannot be undone, are you sure that you want to continue? (y/N): </>', false);
@@ -169,7 +179,100 @@ class UniqueCommand extends AbstractMagentoCommand
             }
         } else {
             $this->getOutputInterface()->writeLn('<fg=green;options=bold>Dry run detected, nothing will actually happen</>');
-            $this->getOutputInterface()->writeLn('<fg=green;options=bold>Logfile will be written in: ' . $this->getLogdir() . '</>');
+            \Mage::log('Dry run detected, nothing will actually happen', null, $this->logfile);
         }
+
+        $this->getOutputInterface()->writeLn('<fg=green;options=bold>Backups will be stored in: '. $this->getBackupdir() . '!</>');
+        \Mage::log('Backups will be stored in: '. $this->getBackupdir() . '!', null, $this->logfile);
+
+        $this->getOutputInterface()->writeLn('<fg=green;options=bold>Logs will be written in: ' . $this->getLogdir() . '/' . $this->logfile . '</>');
+        \Mage::log('Logs will be written in: ' . $this->getLogdir() . '/' . $this->logfile, null, $this->logfile);
+
+        $this->removeDuplicateImages();
 	}
+
+    /**
+     * Remove the duplicates
+     */
+    protected function removeDuplicateImages()
+    {
+
+        $mediaApi = \Mage::getModel("catalog/product_attribute_media_api");
+        $products = \Mage::getModel('catalog/product')->getCollection();
+
+        $i =0;
+        $total = count($products);
+        $count = 0;
+
+        // create a new progress bar (50 units)
+        $progress = new ProgressBar($this->getOutputInterface(), $total);
+
+        foreach($products as $prod)
+        {
+            $product = \Mage::getModel('catalog/product')->load($prod->getId());
+            $md5_values = array();
+
+            //protected base image
+            $base_image = $product->getImage();
+            if($base_image != 'no_selection')
+            {
+                $filepath =  \Mage::getBaseDir('media') .'/catalog/product' . $base_image  ;
+                if(file_exists($filepath))
+                    $md5_values[] = md5(file_get_contents($filepath));
+            }
+
+            $i ++;
+
+            \Mage::log("Processing product $i of $total (SKU: " . $product->getSku() . ")", null, $this->logfile);
+
+            // Loop through product images
+            $images = $product->getMediaGalleryImages();
+            if($images){
+                foreach($images as $image){
+                    //protected base image
+                    if($image->getFile() == $base_image)
+                        continue;
+
+                    $filepath =  \Mage::getBaseDir('media') .'/catalog/product' . $image->getFile()  ;
+                    if(file_exists($filepath))
+                        $md5 = md5(file_get_contents($filepath));
+                    else
+                        continue;
+
+                    if(in_array($md5, $md5_values))
+                    {
+                        if($this->getMode() == 'live' || ($this->getMode() == 'test' && $product->getSku() == $this->getInputInterface()->getOption('sku'))) {
+                            $mediaApi->remove($product->getId(),  $image->getFile());
+
+                            \Mage::log("Removed duplicate image from " . $product->getSku(), null, $this->logfile);
+                        } else {
+                            \Mage::log("Would remove duplicate image from " . $product->getSku(), null, $this->logfile);
+                        }
+
+                        \Mage::log("Image name: " . $image->getFile(), null, $this->logfile);
+
+                        $count++;
+                    } else {
+                        $md5_values[] = $md5;
+                    }
+
+                }
+            }
+
+            $progress->advance();
+
+        }
+
+        $progress->finish();
+
+        $this->getOutputInterface()->writeLn(PHP_EOL);
+
+        if($this->getMode() == 'dry') {
+            \Mage::log("Finished! Would have removed $count duplicated images", null, $this->logfile);
+            $this->getOutputInterface()->writeLn("<fg=green;options=bold>Finished! Would have removed $count duplicated images</>");
+        } else {
+            \Mage::log("Finished! Removed $count duplicated images", null, $this->logfile);
+            $this->getOutputInterface()->writeLn("<fg=green;options=bold>Finished! Removed $count duplicated images</>");
+        }
+    }
 }
