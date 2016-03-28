@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Console\Helper\ProgressBar;
 
-class UniqueCommand extends AbstractMagentoCommand
+class MediaDuplicatesCommand extends AbstractMagentoCommand
 {
 	/**
 	 * @var string
@@ -36,7 +36,7 @@ class UniqueCommand extends AbstractMagentoCommand
      * Whats the directory we backup in (or fetch the backup from)
      * @var string
      */
-    protected $backupdir = '/var/unique';
+    protected $backupdir = '/var/duplicates';
 
 	/**
 	 * Input and output interfaces
@@ -83,7 +83,7 @@ class UniqueCommand extends AbstractMagentoCommand
 
             $this->logfile = 'duplicates-' . $this->getMode() . '-' . date('YmdHis', time()) . '.log';
 
-            $this->runUniqueImagesCommand();
+            $this->runRemoveDuplicateImagesCommand();
 		}
 	}
 
@@ -162,7 +162,7 @@ class UniqueCommand extends AbstractMagentoCommand
     /**
      * Actually run the script to see what images are duplicates
      */
-	protected function runUniqueImagesCommand()
+	protected function runRemoveDuplicateImagesCommand()
 	{
 		if($this->getMode() == 'live') {
 			$helper = $this->getHelper('question');
@@ -234,16 +234,22 @@ class UniqueCommand extends AbstractMagentoCommand
                         continue;
 
                     $filepath =  \Mage::getBaseDir('media') .'/catalog/product' . $image->getFile()  ;
-                    if(file_exists($filepath))
+                    if(file_exists($filepath)) {
                         $md5 = md5(file_get_contents($filepath));
-                    else
+                    } else {
                         continue;
+                    }
 
                     if(in_array($md5, $md5_values))
                     {
+                        // Backup existing
+                        if(!is_dir(dirname($this->getBackupdir() . '/catalog/product' . $image->getFile()))) {
+                            @mkdir(dirname($this->getBackupdir() . '/catalog/product' . $image->getFile()), 0777, true);
+                            copy($filepath, $this->getBackupdir() . '/catalog/product' . $image->getFile());
+                        }
+
                         if($this->getMode() == 'live' || ($this->getMode() == 'test' && $product->getSku() == $this->getInputInterface()->getOption('sku'))) {
                             $mediaApi->remove($product->getId(),  $image->getFile());
-
                             \Mage::log("Removed duplicate image from " . $product->getSku(), null, $this->logfile);
                         } else {
                             \Mage::log("Would remove duplicate image from " . $product->getSku(), null, $this->logfile);

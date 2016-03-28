@@ -4,4 +4,6 @@ autoloaders:
 commands:
   customCommands:
     - Wizkunde\CacheWarmerCommand
-    - Wizkunde\UniqueCommand
+    - Wizkunde\MediaDuplicatesCommand
+    - Wizkunde\MediaOrphansCommand
+    - Wizkunde\MediaMissingCommand
