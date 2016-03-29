@@ -26,7 +26,7 @@ Mode explanation
  
 ## Extra credits
 
-Inspired by Peter Jaap Blaakmeer from Elgetos his repository (https://github.com/peterjaap/magerun-addons), i built this one to provide me with similar functionalities and adding rollback support to the media part
+Inspired by Peter Jaap Blaakmeer from Elgentos his repository (https://github.com/peterjaap/magerun-addons), i built this one to provide me with similar functionalities and adding rollback support to the media part
 
 ## Available custom commands
 - wizkunde:cache:warm - Warms the cache based on the Sitemap files generated in your installation
