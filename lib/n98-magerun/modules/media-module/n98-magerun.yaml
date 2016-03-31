@@ -7,3 +7,4 @@ commands:
     - Wizkunde\MediaDuplicatesCommand
     - Wizkunde\MediaOrphansCommand
     - Wizkunde\MediaMissingCommand
+    - Wizkunde\PackageGenerateCommand
