@@ -168,6 +168,13 @@ class ReviewImportCommand extends AbstractMagentoCommand
                 $this->getOutputInterface()->writeln('<fg=red;options=bold>Canceled the live run due to confirmation!</>');
                 return;
             }
+        } else if($this->getMode() == 'test') {
+            if($this->getMode() == 'test') {
+                if($this->getInputInterface()->getOption('sku') == '') {
+                    $this->getOutputInterface()->writeln('<fg=red;options=bold>Cant execute test mode when sku is not set, please use --sku together with testmode!</>');
+                    return;
+                }
+            }
         } else {
             $this->getOutputInterface()->writeLn('<fg=green;options=bold>Dry run detected, nothing will actually happen</>');
             \Mage::log('Dry run detected, nothing will actually happen', null, $this->logfile);
@@ -211,46 +218,78 @@ class ReviewImportCommand extends AbstractMagentoCommand
                         if($productId != null) {
                             $review->load((string) $row->xpath('Cell[2]/Data')[0]);
 
-                            $collection = $review->getProductCollection()
-                                ->addCustomerFilter($review->getCustomerId())
-                                ->setStoreFilter($this->getInputInterface()->getOption('store'));
+                            if($review->getId() != null) {
+                                $mustLoadUser = true;
 
-                            $collection->getSelect()
-                                ->where('rt.entity_pk_value = ?', $productId);
+                                if($review->getCustomerId() != null) {
+                                    $collection = $review->getProductCollection()
+                                        ->addCustomerFilter($review->getCustomerId())
+                                        ->setStoreFilter($this->getInputInterface()->getOption('store'));
 
-                            if($collection->count() > 0) {
-                                \Mage::log("Skipping review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)", null, $this->logfile);
-                                $this->getOutputInterface()->writeLn("<fg=green;options=bold>Skipping review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)</>");
+                                    $collection->getSelect()
+                                        ->where('rt.entity_pk_value = ?', $productId);
 
-                                continue;
-                            }
+                                    if ($collection->count() > 0) {
+                                        \Mage::log("Skipping review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)", null, $this->logfile);
+                                        $this->getOutputInterface()->writeLn("<fg=green;options=bold>Skipping review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)</>");
 
-                            $customer->load($review->getCustomerId());
-
-                            if($customer->getId() != null) {
-                                if ($this->getMode() == 'live' || ($this->getMode() == 'test' && $this->getInputInterface()->getOption('sku') == $sku)) {
-                                    \Mage::log("Adding review for SKU: $sku", null, $this->logfile);
-                                    $this->getOutputInterface()->writeLn("<fg=green;options=bold>Adding review for SKU: $sku</>");
-
-                                    $review->setEntityPkValue($productId)
-                                        ->setTitle((string)$row->xpath('Cell[5]/Data')[0])
-                                        ->setDetail((string)$row->xpath('Cell[6]/Data')[0])
-                                        ->setStatusId(1)
-                                        ->setEntityId(1)
-                                        ->setStoreId($this->getInputInterface()->getOption('store'))
-                                        ->setStores(array($this->getInputInterface()->getOption('store')))
-                                        ->setCustomerId($customer->getId())
-                                        ->setNickname($customer->getFirstname())
-                                        ->save();
-
-                                    $review->aggregate();
+                                        continue;
+                                    }
                                 } else {
-                                    \Mage::log("Would have added review for SKU: $sku", null, $this->logfile);
-                                    $this->getOutputInterface()->writeLn("<fg=green;options=bold>Would have added review for SKU: $sku</>");
+                                    $mustLoadUser = false;
                                 }
-                            } else {
+
+                                if($mustLoadUser == false || $review->getCustomerId() != null) {
+                                    if ($this->getMode() == 'live' || ($this->getMode() == 'test' && $this->getInputInterface()->getOption('sku') == $sku)) {
+                                        \Mage::log("Adding review for SKU: $sku", null, $this->logfile);
+                                        $this->getOutputInterface()->writeLn("<fg=green;options=bold>Adding review for SKU: $sku</>");
+
+                                        $newReview = clone($reviewModel);
+
+                                        $newReview->setEntityPkValue($productId)
+                                            ->setStatusId(1)
+                                            ->setTitle((string)$row->xpath('Cell[3]/Data')[0])
+                                            ->setDetail((string)$row->xpath('Cell[4]/Data')[0])
+                                            ->setStatusId(1)
+                                            ->setEntityId(1)
+                                            ->setStoreId($this->getInputInterface()->getOption('store'))
+                                            ->setStores(array($this->getInputInterface()->getOption('store')));
+
+                                        if($review->getCustomerId() != null) {
+                                            $newReview->setCustomerId($review->getCustomerId());
+                                        }
+
+                                        if($review->getNickname() != null) {
+                                            $newReview->setNickname($review->getNickname());
+                                        }
+
+                                        if($review->getCreatedAt() != null) {
+                                            $newReview->setCreatedAt($review->getCreatedAt());
+                                        }
+
+                                        $newReview->save();
+                                        $review->aggregate();
+
+                                        $votes = \Mage::getModel('rating/rating_option_vote')
+                                             ->getResourceCollection()
+                                             ->setEntityPkFilter($review->getEntityPkValue())
+                                             ->addFilter('review_id', $review->getId())
+                                             ->load();
+
+                                        foreach($votes as $vote) {
+                                            \Mage::getModel('rating/rating')
+                                                ->setRatingId($vote->getRatingId())
+                                                ->setReviewId($newReview->getId())
+                                                ->addOptionVote($vote->getOptionId(), $productId);
+                                        }
+                                    } else {
+                                        \Mage::log("Would have added review for SKU: $sku", null, $this->logfile);
+                                        $this->getOutputInterface()->writeLn("<fg=green;options=bold>Would have added review for SKU: $sku</>");
+                                    }
+                                } else {
                                     \Mage::log("Skipping review for SKU: $sku for customer with review id: " . (string) $row->xpath('Cell[2]/Data')[0] . " (Unknown Customer)", null, $this->logfile);
                                     $this->getOutputInterface()->writeLn("<fg=green;options=bold>Skipping review for SKU: $sku for customer with review ID: " . (string) $row->xpath('Cell[2]/Data')[0] . " (Unkown customer)</>");
+                                }
                             }
                         } else {
                             \Mage::log("Skipping SKU: $sku (product does not exist)", null, $this->logfile);
