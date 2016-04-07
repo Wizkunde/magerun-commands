@@ -204,14 +204,11 @@ class ReviewImportCommand extends AbstractMagentoCommand
                         $sku = (string) $row->xpath('Cell[1]/Data')[0];
 
                         $customer = clone($customerModel);
-                        $product = clone($productModel);
                         $review = clone($reviewModel);
 
-                        $productId = $product->getResource()->getIdBySku($sku);
+                        $productId = $productModel->getResource()->getIdBySku($sku);
 
                         if($productId != null) {
-                            $product->load($productId);
-
                             $review->load((string) $row->xpath('Cell[2]/Data')[0]);
 
                             $collection = $review->getProductCollection()
@@ -235,7 +232,7 @@ class ReviewImportCommand extends AbstractMagentoCommand
                                     \Mage::log("Adding review for SKU: $sku", null, $this->logfile);
                                     $this->getOutputInterface()->writeLn("<fg=green;options=bold>Adding review for SKU: $sku</>");
 
-                                    $review->setEntityPkValue($product->getId())
+                                    $review->setEntityPkValue($productId)
                                         ->setTitle((string)$row->xpath('Cell[5]/Data')[0])
                                         ->setDetail((string)$row->xpath('Cell[6]/Data')[0])
                                         ->setStatusId(1)
