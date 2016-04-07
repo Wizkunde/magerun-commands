@@ -8,3 +8,4 @@ commands:
     - Wizkunde\MediaOrphansCommand
     - Wizkunde\MediaMissingCommand
     - Wizkunde\PackageGenerateCommand
+    - Wizkunde\ReviewImportCommand
