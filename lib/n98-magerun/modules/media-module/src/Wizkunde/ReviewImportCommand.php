@@ -47,14 +47,14 @@ class ReviewImportCommand extends AbstractMagentoCommand
     protected function configure()
     {
         $this
-            ->setName('wizkunde:review:import')
-            ->setDescription('Import reviews from a XML file')
+            ->setName('wizkunde:review:import-translation')
+            ->setDescription('Import review translations from a XML file')
             ->setDefinition(
                 new InputDefinition(array(
                     new InputOption('sku', 's', InputOption::VALUE_REQUIRED, 'Sku for when in test mode'),
                     new InputOption('file', 'f', InputOption::VALUE_REQUIRED, 'File to load from'),
-                    new InputOption('store', 'S', InputOption::VALUE_REQUIRED, 'Store to use'),
-                    new InputArgument('mode', InputOption::VALUE_REQUIRED, 'rollback, live, dry (default)')
+                    new InputOption('store', 'S', InputOption::VALUE_REQUIRED, 'New store to use'),
+                    new InputArgument('mode', InputOption::VALUE_REQUIRED, 'test, live, dry (default)')
                 ))
             );
     }
@@ -156,7 +156,7 @@ class ReviewImportCommand extends AbstractMagentoCommand
     }
 
     /**
-     * Actually run the script to see what images are duplicates
+     * Actually run the script to import the translations for reviews
      */
     protected function runImportProductReviewsCommand()
     {
@@ -180,7 +180,7 @@ class ReviewImportCommand extends AbstractMagentoCommand
     }
 
     /**
-     * Rollback all the images we moved to the backup directory
+     * Import Review Translations
      */
     protected function importProductReviews()
     {
