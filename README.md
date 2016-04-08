@@ -101,12 +101,9 @@ Options:
   -S, --store=STORE          New store to use
 
 Open a random excel file (XLSX or anything).
-Save the tab that you want to import into a new excel file in XML format.
-
+Save the tab that you want to import into a new excel file in XML format if there are multiple tabs.
 The first row is ignored due to it being headers.
-The row structure should be:
-First Cell: SKU
-Second Cell: Original review ID
-Third Cell: Translated Title
-Fourth Cell: Translated Review
+Check the image for a layout:
+
+![Schermafbeelding 2016-04-08 om 07.54.21.png](https://bitbucket.org/repo/4drEd4/images/595691369-Schermafbeelding%202016-04-08%20om%2007.54.21.png)
 ```
