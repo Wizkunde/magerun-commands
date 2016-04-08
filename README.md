@@ -105,5 +105,6 @@ Save the tab that you want to import into a new excel file in XML format if ther
 The first row is ignored due to it being headers.
 Check the image for a layout:
 
-![Schermafbeelding 2016-04-08 om 07.54.21.png](https://bitbucket.org/repo/4drEd4/images/595691369-Schermafbeelding%202016-04-08%20om%2007.54.21.png)
 ```
+
+![Schermafbeelding 2016-04-08 om 07.54.21.png](https://bitbucket.org/repo/4drEd4/images/595691369-Schermafbeelding%202016-04-08%20om%2007.54.21.png)
