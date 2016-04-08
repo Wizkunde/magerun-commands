@@ -85,3 +85,28 @@ Arguments:
 Options:
   -s, --sku=SKU              Sku for when in test mode
 ```
+
+## wizkunde:review:import-translations
+
+```bash
+Usage:
+  wizkunde:review:import-translation [options] [--] [<mode>]
+
+Arguments:
+  mode                       test, live, dry (default)
+
+Options:
+  -s, --sku=SKU              Sku for when in test mode
+  -f, --file=FILE            File to load from
+  -S, --store=STORE          New store to use
+
+Open a random excel file (XLSX or anything).
+Save the tab that you want to import into a new excel file in XML format.
+
+The first row is ignored due to it being headers.
+The row structure should be:
+First Cell: SKU
+Second Cell: Original review ID
+Third Cell: Translated Title
+Fourth Cell: Translated Review
+```
