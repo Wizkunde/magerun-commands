@@ -220,7 +220,8 @@ class ReviewImportCommand extends AbstractMagentoCommand
 
                             if($review->getId() != null) {
                                 $mustLoadUser = true;
-
+                                $update = false;
+                                
                                 if($review->getCustomerId() != null) {
                                     $collection = $review->getProductCollection()
                                         ->addCustomerFilter($review->getCustomerId())
@@ -230,10 +231,11 @@ class ReviewImportCommand extends AbstractMagentoCommand
                                         ->where('rt.entity_pk_value = ?', $productId);
 
                                     if ($collection->count() > 0) {
-                                        \Mage::log("Skipping review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)", null, $this->logfile);
-                                        $this->getOutputInterface()->writeLn("<fg=green;options=bold>Skipping review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)</>");
+                                        $newReview = $collection->getFirstItem();
+                                        \Mage::log("Updating review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)", null, $this->logfile);
+                                        $this->getOutputInterface()->writeLn("<fg=green;options=bold>Updating review for SKU: $sku for customer with ID: " . $review->getCustomerId() . " (Review exists)</>");
 
-                                        continue;
+                                        $update = true;
                                     }
                                 } else {
                                     $mustLoadUser = false;
@@ -244,7 +246,9 @@ class ReviewImportCommand extends AbstractMagentoCommand
                                         \Mage::log("Adding review for SKU: $sku", null, $this->logfile);
                                         $this->getOutputInterface()->writeLn("<fg=green;options=bold>Adding review for SKU: $sku</>");
 
-                                        $newReview = clone($reviewModel);
+                                        if($update == false) {
+                                            $newReview = clone($reviewModel);
+                                        }
 
                                         $newReview->setEntityPkValue($productId)
                                             ->setStatusId(1)
@@ -263,12 +267,16 @@ class ReviewImportCommand extends AbstractMagentoCommand
                                             $newReview->setNickname($review->getNickname());
                                         }
 
+                                        $newReview->save();
+                                        
+                                        // Save again to be able to overwrite the auto generated generation time!
+                                        // You cant do it before the first save, unless you hook into the _afterSave action
                                         if($review->getCreatedAt() != null) {
                                             $newReview->setCreatedAt($review->getCreatedAt());
+                                            $newReview->save();
                                         }
 
-                                        $newReview->save();
-                                        $review->aggregate();
+                                        $newReview->aggregate();
 
                                         $votes = \Mage::getModel('rating/rating_option_vote')
                                              ->getResourceCollection()
